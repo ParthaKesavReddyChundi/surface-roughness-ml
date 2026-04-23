@@ -2,6 +2,8 @@
 
 import pandas as pd
 import numpy as np
+import joblib
+import os
 
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -92,6 +94,25 @@ for name, model in models.items():
 best_model = min(results, key=lambda x: results[x]['RMSE'])
 
 print("🏆 BEST MODEL:", best_model)
+
+# ==============================
+# SAVE BEST MODEL + SCALER
+# ==============================
+print("\n=== SAVING MODEL ===")
+
+# Refit best model on full dataset with a fresh pipeline
+best_pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', models[best_model])
+])
+best_pipeline.fit(X, y)
+
+os.makedirs("saved_model", exist_ok=True)
+joblib.dump(best_pipeline, "saved_model/pipeline.pkl")
+joblib.dump(list(X.columns), "saved_model/feature_names.pkl")
+
+print(f"Pipeline (scaler + {best_model}) saved → saved_model/pipeline.pkl")
+print(f"Feature names saved → saved_model/feature_names.pkl")
 
 # ==============================
 # FEATURE IMPORTANCE (XGBOOST)

@@ -1,4 +1,17 @@
 venv/
 __pycache__/
 *.pyc
-*.pkl
+
+# Generated model artifacts (regenerate via final_model.py)
+saved_model/
+
+# Excel temp files
+~$*.xlsx
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

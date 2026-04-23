@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SurfaceSense — Real-Time Ra Predictor</title>
+  <meta name="description" content="Predict FDM 3D print surface roughness (Ra) in real-time using vibration and process parameters." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ── BACKGROUND CANVAS ─────────────────────────────────── -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- ── APP SHELL ──────────────────────────────────────────── -->
+  <div id="app">
+
+    <!-- HEADER -->
+    <header id="site-header">
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <span class="logo-text">SurfaceSense</span>
+      </div>
+      <nav class="pills">
+        <span class="pill active">Predict</span>
+        <span class="pill">About</span>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section id="hero">
+      <p class="hero-eyebrow" id="eyebrow">In-Situ Surface Roughness</p>
+      <h1 class="hero-title" id="hero-title">
+        Predict Ra<br /><em>before you touch it.</em>
+      </h1>
+      <p class="hero-sub" id="hero-sub">
+        Feed your printer settings and live vibration reading — get an
+        instant surface quality prediction, no profilometer needed.
+      </p>
+    </section>
+
+    <!-- MAIN CARD -->
+    <main id="main-content">
+
+      <!-- INPUT PANEL -->
+      <section class="card" id="input-card">
+        <h2 class="card-title">Printer Parameters</h2>
+        <p class="card-desc">Enter the values from your slicer and accelerometer.</p>
+
+        <form id="predict-form" novalidate>
+
+          <div class="field-grid">
+
+            <!-- Print Speed -->
+            <div class="field" id="field-speed">
+              <label for="print_speed">
+                <span class="field-icon">⚡</span>
+                Print Speed
+                <span class="field-unit">mm/s</span>
+              </label>
+              <input id="print_speed" name="print_speed" type="number"
+                     step="any" placeholder="e.g. 60" required />
+              <span class="field-range">Typical: 30–100 mm/s</span>
+            </div>
+
+            <!-- Layer Height -->
+            <div class="field" id="field-layer">
+              <label for="layer_height">
+                <span class="field-icon">📐</span>
+                Layer Height
+                <span class="field-unit">mm</span>
+              </label>
+              <input id="layer_height" name="layer_height" type="number"
+                     step="any" placeholder="e.g. 0.2" required />
+              <span class="field-range">Typical: 0.1–0.4 mm</span>
+            </div>
+
+            <!-- Nozzle Temp -->
+            <div class="field" id="field-temp">
+              <label for="nozzle_temp">
+                <span class="field-icon">🌡</span>
+                Nozzle Temp
+                <span class="field-unit">°C</span>
+              </label>
+              <input id="nozzle_temp" name="nozzle_temp" type="number"
+                     step="any" placeholder="e.g. 210" required />
+              <span class="field-range">Typical: 190–230 °C</span>
+            </div>
+
+            <!-- Vibration -->
+            <div class="field" id="field-vib">
+              <label for="vibration_freq">
+                <span class="field-icon">〰</span>
+                Vibration Freq
+                <span class="field-unit">Hz</span>
+              </label>
+              <input id="vibration_freq" name="vibration_freq" type="number"
+                     step="any" placeholder="e.g. 120" required />
+              <span class="field-range">Accelerometer reading</span>
+            </div>
+
+          </div><!-- /.field-grid -->
+
+          <button type="submit" id="predict-btn">
+            <span class="btn-label">Predict Surface Roughness</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+        </form>
+      </section><!-- /#input-card -->
+
+      <!-- RESULT PANEL -->
+      <section class="card" id="result-card" aria-live="polite">
+        <div id="result-idle">
+          <div class="idle-icon">◎</div>
+          <p>Results will appear here after prediction.</p>
+        </div>
+
+        <div id="result-data" hidden>
+
+          <div id="ra-display">
+            <span class="ra-label">Predicted Ra</span>
+            <span class="ra-value" id="ra-value">0.0000</span>
+            <span class="ra-unit">µm</span>
+          </div>
+
+          <div id="quality-badge">
+            <span id="quality-icon"></span>
+            <span id="quality-text"></span>
+          </div>
+
+          <!-- gauge bar -->
+          <div id="gauge-wrap">
+            <div id="gauge-track">
+              <div id="gauge-fill"></div>
+              <div id="gauge-needle"></div>
+            </div>
+            <div id="gauge-labels">
+              <span>2 µm<br/><em>Smooth</em></span>
+              <span>5 µm<br/><em>Acceptable</em></span>
+              <span>7 µm<br/><em>Rough</em></span>
+            </div>
+          </div>
+
+          <!-- interpretation -->
+          <p id="interpretation"></p>
+
+        </div><!-- /#result-data -->
+
+        <div id="result-error" hidden>
+          <span class="err-icon">⚠</span>
+          <p id="error-msg"></p>
+        </div>
+
+      </section><!-- /#result-card -->
+
+    </main><!-- /#main-content -->
+
+    <!-- FOOTER -->
+    <footer id="site-footer">
+      <p>FDM In-Situ Quality Control · ML-Powered · SDG 9 &amp; 12</p>
+    </footer>
+
+  </div><!-- /#app -->
+
+  <!-- GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
