@@ -225,8 +225,7 @@ To improve results:
 
 ## 👨‍💻 Author
 
-Your Name  
-(Add your GitHub profile here)
+Partha Kesav Reddy Chundi  
 
 ---
 
