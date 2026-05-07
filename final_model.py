@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import joblib
+import json
 import os
 
 from sklearn.model_selection import KFold, cross_val_score
@@ -93,7 +94,7 @@ for name, model in models.items():
 # ==============================
 best_model = min(results, key=lambda x: results[x]['RMSE'])
 
-print("🏆 BEST MODEL:", best_model)
+print("BEST MODEL:", best_model)
 
 # ==============================
 # SAVE BEST MODEL + SCALER
@@ -111,8 +112,18 @@ os.makedirs("saved_model", exist_ok=True)
 joblib.dump(best_pipeline, "saved_model/pipeline.pkl")
 joblib.dump(list(X.columns), "saved_model/feature_names.pkl")
 
-print(f"Pipeline (scaler + {best_model}) saved → saved_model/pipeline.pkl")
-print(f"Feature names saved → saved_model/feature_names.pkl")
+# Save metadata so confidence.py can use actual training RMSE
+model_meta = {
+    "best_model": best_model,
+    "rmse":       float(results[best_model]["RMSE"]),
+    "r2":         float(results[best_model]["R2"]),
+}
+with open("saved_model/model_meta.json", "w") as f:
+    json.dump(model_meta, f, indent=2)
+
+print(f"Pipeline (scaler + {best_model}) saved -> saved_model/pipeline.pkl")
+print(f"Feature names saved          -> saved_model/feature_names.pkl")
+print(f"Model metadata saved         -> saved_model/model_meta.json")
 
 # ==============================
 # FEATURE IMPORTANCE (XGBOOST)

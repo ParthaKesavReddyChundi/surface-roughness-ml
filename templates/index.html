@@ -3,171 +3,377 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SurfaceSense — Real-Time Ra Predictor</title>
-  <meta name="description" content="Predict FDM 3D print surface roughness (Ra) in real-time using vibration and process parameters." />
+  <title>SurfaceSense — FDM Quality Intelligence</title>
+  <meta name="description" content="Real-time FDM surface roughness prediction with XAI, optimizer, and session history." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
 
-  <!-- ── BACKGROUND CANVAS ─────────────────────────────────── -->
-  <canvas id="bg-canvas"></canvas>
+  <!-- CSS animated background (zero JS overhead) -->
+  <div class="bg-glow">
+    <span class="orb orb1"></span>
+    <span class="orb orb2"></span>
+    <span class="orb orb3"></span>
+  </div>
 
-  <!-- ── APP SHELL ──────────────────────────────────────────── -->
-  <div id="app">
+  <div id="layout">
 
-    <!-- HEADER -->
-    <header id="site-header">
-      <div class="logo">
-        <span class="logo-icon">⬡</span>
-        <span class="logo-text">SurfaceSense</span>
+    <!-- ══════════ SIDEBAR ══════════ -->
+    <aside id="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-icon">⬡</span>
+        <span class="brand-text">SurfaceSense</span>
       </div>
-      <nav class="pills">
-        <span class="pill active">Predict</span>
-        <span class="pill">About</span>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="overview">
+          <span class="ni">🏠</span><span class="nl">Overview</span>
+        </button>
+        <button class="nav-item" data-section="predict">
+          <span class="ni">⬡</span><span class="nl">Predict Ra</span>
+        </button>
+        <button class="nav-item" data-section="explain">
+          <span class="ni">🔍</span><span class="nl">Explainable AI</span>
+          <span class="nav-dot" id="explain-dot" hidden></span>
+        </button>
+        <button class="nav-item" data-section="model">
+          <span class="ni">📊</span><span class="nl">Model Insights</span>
+        </button>
+        <button class="nav-item" data-section="optimizer">
+          <span class="ni">🎯</span><span class="nl">Optimizer</span>
+          <span class="nav-dot" id="optimizer-dot" hidden></span>
+        </button>
+        <button class="nav-item" data-section="history">
+          <span class="ni">📜</span><span class="nl">History</span>
+        </button>
+        <button class="nav-item" data-section="guide">
+          <span class="ni">📖</span><span class="nl">Parameter Guide</span>
+        </button>
       </nav>
-    </header>
 
-    <!-- HERO -->
-    <section id="hero">
-      <p class="hero-eyebrow" id="eyebrow">In-Situ Surface Roughness</p>
-      <h1 class="hero-title" id="hero-title">
-        Predict Ra<br /><em>before you touch it.</em>
-      </h1>
-      <p class="hero-sub" id="hero-sub">
-        Feed your printer settings and live vibration reading — get an
-        instant surface quality prediction, no profilometer needed.
-      </p>
-    </section>
+      <div class="sidebar-footer">
+        <div class="sf-model" id="sf-model-name">ML Powered</div>
+        <div class="sf-sub">FDM Quality Control · SDG 9</div>
+      </div>
+    </aside>
 
-    <!-- MAIN CARD -->
-    <main id="main-content">
+    <div id="sidebar-overlay"></div>
 
-      <!-- INPUT PANEL -->
-      <section class="card" id="input-card">
-        <h2 class="card-title">Printer Parameters</h2>
-        <p class="card-desc">Enter the values from your slicer and accelerometer.</p>
+    <!-- ══════════ MAIN CONTENT ══════════ -->
+    <div id="main-wrap">
 
-        <form id="predict-form" novalidate>
+      <!-- Topbar -->
+      <header id="topbar">
+        <button id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        <span class="topbar-title" id="topbar-title">Overview</span>
+        <div class="topbar-right">
+          <span class="last-ra-pill" id="last-ra-pill" hidden></span>
+        </div>
+      </header>
 
-          <div class="field-grid">
-
-            <!-- Print Speed -->
-            <div class="field" id="field-speed">
-              <label for="print_speed">
-                <span class="field-icon">⚡</span>
-                Print Speed
-                <span class="field-unit">mm/s</span>
-              </label>
-              <input id="print_speed" name="print_speed" type="number"
-                     step="any" placeholder="e.g. 60" required />
-              <span class="field-range">Typical: 30–100 mm/s</span>
-            </div>
-
-            <!-- Layer Height -->
-            <div class="field" id="field-layer">
-              <label for="layer_height">
-                <span class="field-icon">📐</span>
-                Layer Height
-                <span class="field-unit">mm</span>
-              </label>
-              <input id="layer_height" name="layer_height" type="number"
-                     step="any" placeholder="e.g. 0.2" required />
-              <span class="field-range">Typical: 0.1–0.4 mm</span>
-            </div>
-
-            <!-- Nozzle Temp -->
-            <div class="field" id="field-temp">
-              <label for="nozzle_temp">
-                <span class="field-icon">🌡</span>
-                Nozzle Temp
-                <span class="field-unit">°C</span>
-              </label>
-              <input id="nozzle_temp" name="nozzle_temp" type="number"
-                     step="any" placeholder="e.g. 210" required />
-              <span class="field-range">Typical: 190–230 °C</span>
-            </div>
-
-            <!-- Vibration -->
-            <div class="field" id="field-vib">
-              <label for="vibration_freq">
-                <span class="field-icon">〰</span>
-                Vibration Freq
-                <span class="field-unit">Hz</span>
-              </label>
-              <input id="vibration_freq" name="vibration_freq" type="number"
-                     step="any" placeholder="e.g. 120" required />
-              <span class="field-range">Accelerometer reading</span>
-            </div>
-
-          </div><!-- /.field-grid -->
-
-          <button type="submit" id="predict-btn">
-            <span class="btn-label">Predict Surface Roughness</span>
-            <span class="btn-spinner" aria-hidden="true"></span>
-          </button>
-
-        </form>
-      </section><!-- /#input-card -->
-
-      <!-- RESULT PANEL -->
-      <section class="card" id="result-card" aria-live="polite">
-        <div id="result-idle">
-          <div class="idle-icon">◎</div>
-          <p>Results will appear here after prediction.</p>
+      <!-- ─── SECTION: OVERVIEW ─── -->
+      <section class="section active" id="section-overview">
+        <div class="section-hero">
+          <p class="sh-eyebrow">In-Situ Surface Roughness Intelligence</p>
+          <h1 class="sh-title">Predict Ra <em>before you touch it.</em></h1>
+          <p class="sh-sub">ML-powered quality control for FDM 3D printing. No profilometer needed.</p>
         </div>
 
-        <div id="result-data" hidden>
-
-          <div id="ra-display">
-            <span class="ra-label">Predicted Ra</span>
-            <span class="ra-value" id="ra-value">0.0000</span>
-            <span class="ra-unit">µm</span>
+        <!-- Quick stats row -->
+        <div class="stats-row" id="stats-row">
+          <div class="stat-card" id="stat-predictions">
+            <span class="stat-val">0</span>
+            <span class="stat-label">Predictions</span>
           </div>
-
-          <div id="quality-badge">
-            <span id="quality-icon"></span>
-            <span id="quality-text"></span>
+          <div class="stat-card" id="stat-best-ra">
+            <span class="stat-val">—</span>
+            <span class="stat-label">Best Ra (µm)</span>
           </div>
-
-          <!-- gauge bar -->
-          <div id="gauge-wrap">
-            <div id="gauge-track">
-              <div id="gauge-fill"></div>
-              <div id="gauge-needle"></div>
-            </div>
-            <div id="gauge-labels">
-              <span>2 µm<br/><em>Smooth</em></span>
-              <span>5 µm<br/><em>Acceptable</em></span>
-              <span>7 µm<br/><em>Rough</em></span>
-            </div>
+          <div class="stat-card" id="stat-model">
+            <span class="stat-val" id="stat-model-val">—</span>
+            <span class="stat-label">Active Model</span>
           </div>
-
-          <!-- interpretation -->
-          <p id="interpretation"></p>
-
-        </div><!-- /#result-data -->
-
-        <div id="result-error" hidden>
-          <span class="err-icon">⚠</span>
-          <p id="error-msg"></p>
+          <div class="stat-card" id="stat-r2">
+            <span class="stat-val" id="stat-r2-val">—</span>
+            <span class="stat-label">R² Score</span>
+          </div>
         </div>
 
-      </section><!-- /#result-card -->
+        <!-- Feature cards -->
+        <h2 class="fc-section-title">Features</h2>
+        <div class="feature-grid">
 
-    </main><!-- /#main-content -->
+          <div class="feature-card fc-accent-purple" data-goto="predict">
+            <div class="fc-icon-wrap"><span class="fc-icon">⬡</span></div>
+            <div class="fc-body">
+              <h3>Predict Ra</h3>
+              <p>Enter print speed, layer height, nozzle temp and vibration frequency — get Ra (µm) instantly.</p>
+            </div>
+            <span class="fc-cta">Predict now →</span>
+          </div>
 
-    <!-- FOOTER -->
-    <footer id="site-footer">
-      <p>FDM In-Situ Quality Control · ML-Powered · SDG 9 &amp; 12</p>
-    </footer>
+          <div class="feature-card fc-accent-teal" data-goto="explain">
+            <div class="fc-icon-wrap"><span class="fc-icon">🔍</span></div>
+            <div class="fc-body">
+              <h3>Explainable AI</h3>
+              <p>See which printer parameters drive your surface quality and by how much.</p>
+            </div>
+            <span class="fc-cta">View XAI →</span>
+          </div>
 
-  </div><!-- /#app -->
+          <div class="feature-card fc-accent-blue" data-goto="model">
+            <div class="fc-icon-wrap"><span class="fc-icon">📊</span></div>
+            <div class="fc-body">
+              <h3>Model Insights</h3>
+              <p>Cross-validated R², RMSE, and global feature importance scores from the trained model.</p>
+            </div>
+            <span class="fc-cta">Explore →</span>
+          </div>
 
-  <!-- GSAP -->
+          <div class="feature-card fc-accent-amber" data-goto="optimizer">
+            <div class="fc-icon-wrap"><span class="fc-icon">🎯</span></div>
+            <div class="fc-body">
+              <h3>Optimizer</h3>
+              <p>AI-generated tips: which parameter to change, in which direction, and expected Ra reduction.</p>
+            </div>
+            <span class="fc-cta">Optimize →</span>
+          </div>
+
+          <div class="feature-card fc-accent-indigo" data-goto="history">
+            <div class="fc-icon-wrap"><span class="fc-icon">📜</span></div>
+            <div class="fc-body">
+              <h3>Session History</h3>
+              <p>Ra trend chart and prediction log — persisted locally across page refreshes.</p>
+            </div>
+            <span class="fc-cta">View history →</span>
+          </div>
+
+          <div class="feature-card fc-accent-rose" data-goto="guide">
+            <div class="fc-icon-wrap"><span class="fc-icon">📖</span></div>
+            <div class="fc-body">
+              <h3>Parameter Guide</h3>
+              <p>Optimal ranges for each parameter, effect on Ra, and print quality reference table.</p>
+            </div>
+            <span class="fc-cta">Read guide →</span>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ─── SECTION: PREDICT ─── -->
+      <section class="section" id="section-predict" hidden>
+        <div class="section-header">
+          <h2>⬡ Predict Surface Roughness</h2>
+          <p>Enter your slicer values and accelerometer reading below.</p>
+        </div>
+        <div class="two-col">
+          <div class="card" id="input-card">
+            <h3 class="card-title">Printer Parameters</h3>
+            <p class="card-desc">All four fields are required.</p>
+            <form id="predict-form" novalidate>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="print_speed"><span class="fi">⚡</span> Print Speed <span class="fu">mm/s</span></label>
+                  <input id="print_speed" type="number" step="any" placeholder="e.g. 60" required />
+                  <span class="fr">Typical: 30–100</span>
+                </div>
+                <div class="field">
+                  <label for="layer_height"><span class="fi">📐</span> Layer Height <span class="fu">mm</span></label>
+                  <input id="layer_height" type="number" step="any" placeholder="e.g. 0.2" required />
+                  <span class="fr">Typical: 0.1–0.4</span>
+                </div>
+                <div class="field">
+                  <label for="nozzle_temp"><span class="fi">🌡</span> Nozzle Temp <span class="fu">°C</span></label>
+                  <input id="nozzle_temp" type="number" step="any" placeholder="e.g. 210" required />
+                  <span class="fr">Typical: 190–230</span>
+                </div>
+                <div class="field">
+                  <label for="vibration_freq"><span class="fi">〰</span> Vibration Freq <span class="fu">Hz</span></label>
+                  <input id="vibration_freq" type="number" step="any" placeholder="e.g. 120" required />
+                  <span class="fr">Accelerometer reading</span>
+                </div>
+              </div>
+              <button type="submit" id="predict-btn">
+                <span class="btn-label">Predict Surface Roughness</span>
+                <span class="btn-spinner"></span>
+              </button>
+            </form>
+          </div>
+
+          <div class="card" id="result-card" aria-live="polite">
+            <div id="result-idle"><div class="idle-icon">◎</div><p>Results appear here.</p></div>
+            <div id="result-data" hidden>
+              <div id="ra-display">
+                <span class="ra-label">Predicted Ra</span>
+                <span class="ra-value" id="ra-value">0.0000</span>
+                <span class="ra-unit">µm</span>
+              </div>
+              <div id="quality-badge"><span id="quality-icon"></span><span id="quality-text"></span></div>
+              <div id="gauge-wrap">
+                <div id="gauge-track"><div id="gauge-fill"></div><div id="gauge-needle"></div></div>
+                <div id="gauge-labels">
+                  <span>2µm<br/><em>Smooth</em></span>
+                  <span>5µm<br/><em>Acceptable</em></span>
+                  <span>7µm<br/><em>Rough</em></span>
+                </div>
+              </div>
+              <div id="confidence-band" hidden>
+                <div class="conf-header"><span>📊</span><span class="conf-title">Confidence Range</span></div>
+                <div><span id="conf-range" class="conf-range"></span></div>
+                <div id="conf-model" class="conf-meta"></div>
+              </div>
+              <p id="interpretation"></p>
+              <div class="predict-actions">
+                <button class="action-link" data-goto="explain">🔍 View AI Explanation</button>
+                <button class="action-link" data-goto="optimizer">🎯 View Optimizer Tips</button>
+              </div>
+            </div>
+            <div id="result-error" hidden><span class="err-icon">⚠</span><p id="error-msg"></p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECTION: EXPLAIN ─── -->
+      <section class="section" id="section-explain" hidden>
+        <div class="section-header">
+          <h2>🔍 Explainable AI</h2>
+          <p>Local gradient attribution — which features drive your surface roughness prediction.</p>
+        </div>
+        <div class="card" id="xai-card">
+          <div class="xai-header">
+            <div><h3 class="card-title">Feature Contributions</h3><p class="card-desc">Why did the model predict this Ra?</p></div>
+            <div class="xai-badges">
+              <span class="opt-badge" id="xai-method">—</span>
+              <span class="xai-ra-echo-wrap">Ra: <strong id="xai-ra-echo">—</strong></span>
+            </div>
+          </div>
+          <div id="xai-prompt"><div class="empty-state"><div class="empty-icon">🔍</div><p>Make a prediction first, then return here to see the AI explanation.</p><button class="action-link" data-goto="predict">Go to Predict →</button></div></div>
+          <div id="xai-loading" hidden><div class="tips-loading"><span class="tips-spinner"></span> Computing attributions…</div></div>
+          <div id="xai-content" hidden>
+            <div class="xai-chart-wrap"><canvas id="xai-chart"></canvas></div>
+            <div id="xai-rows"></div>
+            <p class="xai-footnote">Red bars → increases Ra (worse finish). Green bars → decreases Ra (better finish). Bar width = relative influence.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECTION: MODEL ─── -->
+      <section class="section" id="section-model" hidden>
+        <div class="section-header">
+          <h2>📊 Model Insights</h2>
+          <p>Performance metrics and feature importances from the trained pipeline.</p>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <h3 class="card-title">📈 Performance Metrics</h3>
+            <p class="card-desc">5-fold cross-validated results on 1000 augmented samples.</p>
+            <div id="model-metrics"><div class="tips-loading"><span class="tips-spinner"></span> Loading…</div></div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">🏆 Feature Importance</h3>
+            <p class="card-desc">Global importance scores from the best model.</p>
+            <div class="chart-wrap" style="height:190px"><canvas id="importance-chart"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECTION: OPTIMIZER ─── -->
+      <section class="section" id="section-optimizer" hidden>
+        <div class="section-header">
+          <h2>🎯 Optimization Advisor</h2>
+          <p>Top parameter adjustments to reduce surface roughness, ranked by improvement.</p>
+        </div>
+        <div class="card" id="optimizer-card">
+          <div class="optimizer-header">
+            <div><h3 class="card-title">Parameter Tips</h3><p class="card-desc">Computed from your last prediction.</p></div>
+            <span class="opt-badge">AI Tips</span>
+          </div>
+          <div id="tips-body">
+            <div class="empty-state"><div class="empty-icon">🎯</div><p>Make a prediction first to generate optimization tips.</p><button class="action-link" data-goto="predict">Go to Predict →</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECTION: HISTORY ─── -->
+      <section class="section" id="section-history" hidden>
+        <div class="section-header">
+          <h2>📜 Session History</h2>
+          <p>Ra trend and prediction log for this session (stored in localStorage).</p>
+        </div>
+        <div class="card" id="history-card">
+          <div class="history-header">
+            <div><h3 class="card-title">Prediction Log</h3><p class="card-desc">Most recent first.</p></div>
+            <button id="clear-history-btn" class="clear-btn">Clear</button>
+          </div>
+          <div id="history-empty" class="empty-state"><div class="empty-icon">📜</div><p>No predictions yet this session.</p><button class="action-link" data-goto="predict">Make your first prediction →</button></div>
+          <div id="history-content" hidden>
+            <div class="chart-wrap"><canvas id="history-chart"></canvas></div>
+            <div class="table-wrap"><table id="history-table">
+              <thead><tr><th>#</th><th>Time</th><th>Speed</th><th>Layer</th><th>Temp</th><th>Vib</th><th>Ra (µm)</th><th>Quality</th></tr></thead>
+              <tbody id="history-tbody"></tbody>
+            </table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECTION: GUIDE ─── -->
+      <section class="section" id="section-guide" hidden>
+        <div class="section-header">
+          <h2>📖 Parameter Guide</h2>
+          <p>Optimal settings, physical effects, and Ra quality reference.</p>
+        </div>
+        <div class="guide-grid">
+
+          <div class="card guide-card">
+            <h3 class="card-title">⚡ Print Speed</h3><p class="card-desc">Typical: 30–100 mm/s</p>
+            <p class="guide-text">Higher speeds increase vibration and reduce deposition consistency, generally <span class="guide-bad">increasing Ra</span>.</p>
+            <div class="guide-tip">💡 Start at 60 mm/s. Reduce to 40 mm/s for fine-detail parts.</div>
+            <div class="guide-bar"><span class="gb-lo">30</span><div class="gb-track"><div class="gb-fill" style="left:30%;width:40%;background:var(--green)"></div></div><span class="gb-hi">100</span></div>
+          </div>
+
+          <div class="card guide-card">
+            <h3 class="card-title">📐 Layer Height</h3><p class="card-desc">Typical: 0.1–0.4 mm</p>
+            <p class="guide-text">Most influential parameter. <span class="guide-bad">Larger layers = higher Ra</span>. Thinner layers = smoother but slower.</p>
+            <div class="guide-tip">💡 0.1–0.15 mm for smooth finish; 0.2 mm for balanced quality.</div>
+            <div class="guide-bar"><span class="gb-lo">0.1</span><div class="gb-track"><div class="gb-fill" style="left:0%;width:50%;background:var(--green)"></div></div><span class="gb-hi">0.4</span></div>
+          </div>
+
+          <div class="card guide-card">
+            <h3 class="card-title">🌡 Nozzle Temperature</h3><p class="card-desc">Typical: 190–230 °C (PLA)</p>
+            <p class="guide-text">Affects filament viscosity. Too low → poor adhesion; too high → stringing. Both <span class="guide-bad">increase Ra</span>.</p>
+            <div class="guide-tip">💡 200–210 °C optimal for PLA. Test in 5 °C increments.</div>
+            <div class="guide-bar"><span class="gb-lo">190</span><div class="gb-track"><div class="gb-fill" style="left:25%;width:50%;background:var(--green)"></div></div><span class="gb-hi">230</span></div>
+          </div>
+
+          <div class="card guide-card">
+            <h3 class="card-title">〰 Vibration Frequency</h3><p class="card-desc">Accelerometer reading (Hz)</p>
+            <p class="guide-text">Structural vibration causes micro-errors in deposition. <span class="guide-bad">Higher vibration → higher Ra</span>. Unique to this project.</p>
+            <div class="guide-tip">💡 Dampen printer with rubber feet. Tighten frame bolts before printing.</div>
+            <div class="guide-bar"><span class="gb-lo">30</span><div class="gb-track"><div class="gb-fill" style="left:0%;width:35%;background:var(--green)"></div></div><span class="gb-hi">400</span></div>
+          </div>
+
+          <div class="card guide-card guide-full">
+            <h3 class="card-title">📏 Ra Value Reference</h3><p class="card-desc">Quality thresholds used in this project.</p>
+            <div class="ra-ref">
+              <div class="ra-ref-row"><span class="q-pill q1">Smooth</span><span class="ra-ref-range">Ra ≤ 3.5 µm</span><span class="ra-ref-desc">Excellent. Suitable for visual parts and low-friction functional surfaces.</span></div>
+              <div class="ra-ref-row"><span class="q-pill q2">Acceptable</span><span class="ra-ref-range">3.5 – 5.2 µm</span><span class="ra-ref-desc">Good. Light sanding can bring this to a functional finish.</span></div>
+              <div class="ra-ref-row"><span class="q-pill q3">Rough</span><span class="ra-ref-range">Ra > 5.2 µm</span><span class="ra-ref-desc">Visible layer lines. Post-processing required for precision applications.</span></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div><!-- /#main-wrap -->
+  </div><!-- /#layout -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/static/history.js"></script>
+  <script src="/static/optimizer.js"></script>
+  <script src="/static/explain.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
